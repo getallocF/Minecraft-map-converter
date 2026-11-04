@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BlockSwap – Minecraft Java ↔ Bedrock World Converter</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;image-rendering:pixelated}
+body{margin:0;font-family:'VT323',monospace;font-size:22px;color:#fff;background:#5a3b22;min-height:100vh;padding:20px 12px}
+.wrap{max-width:720px;margin:0 auto}
+h1{font-family:'Press Start 2P',monospace;font-size:20px;line-height:1.5;text-align:center;text-shadow:4px 4px #3f3f3f}
+h1 span{color:#55ff55}
+.sub{text-align:center;text-shadow:2px 2px #3f3f3f;margin-bottom:18px}
+.panel{background:#c6c6c6;border:4px solid;border-color:#fff #555 #555 #fff;outline:4px solid #000;color:#3f3f3f;padding:16px;margin:12px 4px}
+.row{display:flex;gap:8px;margin:10px 0}
+.btn{font-family:'Press Start 2P',monospace;font-size:11px;color:#e0e0e0;background:#6f6f6f;border:3px solid;border-color:#b0b0b0 #333 #333 #b0b0b0;outline:3px solid #000;text-shadow:2px 2px #3f3f3f;padding:14px 10px;cursor:pointer;flex:1;text-align:center;text-decoration:none;display:block}
+.btn:hover:not(:disabled){background:#7a86c8;color:#ffffa0}
+.btn:disabled{background:#4a4a4a;color:#888;cursor:not-allowed}
+.btn.on{background:#3b8a3b;border-color:#7fd67f #174517 #174517 #7fd67f}
+select{font-family:'VT323',monospace;font-size:22px;width:100%;padding:6px;background:#000;color:#fff;border:3px solid #555}
+.drop{border:4px dashed #555;background:#8b8b8b;color:#fff;text-shadow:2px 2px #3f3f3f;padding:28px 10px;text-align:center;cursor:pointer;margin:12px 0}
+.drop.hot{background:#5d9b5d}
+.bar{height:22px;background:#222;border:3px solid #000;margin:12px 0;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:#7fff00;box-shadow:inset 0 -5px #3aa000,inset 0 3px #c8ff80;transition:width .3s}
+.bar.busy i{width:100%!important;background:repeating-linear-gradient(90deg,#7fff00 0 16px,#3aa000 16px 32px);animation:mv 1s linear infinite}
+@keyframes mv{to{background-position:32px 0}}
+#log{background:#000;color:#aaa;height:150px;overflow:auto;padding:8px;font-size:19px;white-space:pre-wrap}
+.ok{color:#55ff55}.er{color:#ff5555}
+</style></head><body><div class="wrap">
+<h1>Block<span>Swap</span></h1>
+<div class="sub">Convert dunia Minecraft Java ↔ Bedrock</div>
+<div class="panel">
+ <div class="row"><button class="btn on" id="d1">Java → Bedrock</button><button class="btn" id="d2">Bedrock → Java</button></div>
+ <div>Versi tujuan:</div><select id="ver"></select>
+ <div class="drop" id="drop">[ Klik / drop ZIP dunia (.zip / .mcworld) ]<br><span id="fn"></span></div>
+ <input type="file" id="file" accept=".zip,.mcworld" hidden>
+ <button class="btn" id="go" disabled style="width:100%">CONVERT</button>
+ <div class="bar" id="bar"><i id="pb"></i></div>
+ <div id="log"></div><div id="res"></div>
+</div>
+<div class="panel" style="font-size:19px">Backup dunia asli dulu. File dihapus dari server setelah ±1 jam. Bukan produk resmi Mojang / Microsoft.</div>
+</div>
+<script>
+const API="https://GANTI-DENGAN-URL-BACKEND-KAMU"; // <-- ganti
+const $=id=>document.getElementById(id);
+(()=>{const c=document.createElement('canvas');c.width=c.height=16;const g=c.getContext('2d');
+for(let x=0;x<16;x++)for(let y=0;y<16;y++){const v=Math.random();g.fillStyle=v<.2?'#4b311c':v<.55?'#5a3b22':v<.85?'#6a4528':'#7a5230';g.fillRect(x,y,1,1)}
+document.body.style.background=`url(${c.toDataURL()}) 0 0/96px 96px`})();
+const log=(m,c='')=>{const d=$('log');d.insertAdjacentHTML('beforeend',`<div class="${c}">${m.replace(/</g,'&lt;')}</div>`);d.scrollTop=1e9};
+let FM={},target='bedrock',F=null;
+const fill=()=>{$('ver').innerHTML=(FM[target]||[]).map(v=>`<option>${v}</option>`).join('')};
+function setT(t){target=t;$('d1').classList.toggle('on',t=='bedrock');$('d2').classList.toggle('on',t=='java');fill()}
+$('d1').onclick=()=>setT('bedrock');$('d2').onclick=()=>setT('java');
+fetch(API+'/formats').then(r=>r.json()).then(j=>{FM=j;fill()}).catch(()=>log('Backend tidak bisa dihubungi. Cek nilai API di index.html.','er'));
+const pick=f=>{if(!f)return;F=f;$('fn').textContent=f.name+' ('+(f.size/1048576).toFixed(1)+' MB)';$('go').disabled=false};
+$('drop').onclick=()=>$('file').click();$('file').onchange=e=>pick(e.target.files[0]);
+$('drop').ondragover=e=>{e.preventDefault();$('drop').classList.add('hot')};
+$('drop').ondragleave=()=>$('drop').classList.remove('hot');
+$('drop').ondrop=e=>{e.preventDefault();$('drop').classList.remove('hot');pick(e.dataTransfer.files[0])};
+$('go').onclick=()=>{
+ $('go').disabled=true;$('log').innerHTML='';$('res').innerHTML='';$('bar').classList.remove('busy');$('pb').style.width='0';
+ const fd=new FormData();fd.append('file',F);fd.append('target',target);fd.append('version',$('ver').value);
+ const x=new XMLHttpRequest();x.open('POST',API+'/convert');
+ x.upload.onprogress=e=>{if(e.lengthComputable)$('pb').style.width=(e.loaded/e.total*100)+'%'};
+ x.onerror=()=>{log('Gagal upload / backend mati.','er');$('go').disabled=false};
+ x.onload=()=>{let j={};try{j=JSON.parse(x.responseText)}catch{}
+  if(x.status!=200){log('Error: '+(j.detail||x.status),'er');$('go').disabled=false;return}
+  log('Upload selesai, konversi berjalan...');$('bar').classList.add('busy');poll(j.id,0)};
+ x.send(fd)};
+async function poll(id,seen){
+ try{const s=await (await fetch(API+'/status/'+id)).json();
+  (s.log||[]).slice(seen?0:0).forEach(()=>{});$('log').innerHTML='<div>Konversi berjalan...</div>'+(s.log||[]).map(l=>`<div>${l.replace(/</g,'&lt;')}</div>`).join('');
+  if(s.status=='done'){$('bar').classList.remove('busy');$('pb').style.width='100%';log('Selesai!','ok');
+   $('res').innerHTML=`<a class="btn" href="${API}/download/${id}">DOWNLOAD HASIL</a>`;$('go').disabled=false;return}
+  if(s.status=='error'){$('bar').classList.remove('busy');log('ERROR: '+s.error,'er');$('go').disabled=false;return}
+ }catch(e){}
+ setTimeout(()=>poll(id,seen),2000)}
+</script></body></html>
